@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HOLO-CAD</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{--c:#00e5ff;--d:rgba(0,229,255,.3);--bg:rgba(0,16,22,.55)}
+html,body{margin:0;height:100%;background:#000;overflow:hidden;color:var(--c);font:14px "Share Tech Mono",monospace}
+#root{position:fixed;inset:0}
+#stage canvas{display:block}
+#ui{position:absolute;inset:0;pointer-events:none}
+#top{position:absolute;left:0;right:0;top:0;height:46px;display:flex;align-items:center;gap:16px;padding:0 20px;border-bottom:1px solid var(--d);background:linear-gradient(#00303a66,transparent);font:800 15px Orbitron,sans-serif;letter-spacing:4px}
+#top small{font:12px "Share Tech Mono";letter-spacing:1px;opacity:.8}.sp{flex:1}
+#dot{width:9px;height:9px;border-radius:50%;background:#f33;box-shadow:0 0 8px #f33}#dot.ok{background:#3f6;box-shadow:0 0 8px #3f6}
+#banner{position:absolute;top:56px;left:50%;transform:translateX(-50%);padding:8px 22px;background:var(--bg);border:1px solid var(--d);font:800 13px Orbitron,sans-serif;letter-spacing:2px;white-space:nowrap}
+#left{position:absolute;left:16px;top:70px;width:240px;background:var(--bg);border:1px solid var(--d);border-left:3px solid var(--c);padding:10px 14px}
+#left h4{margin:0 0 6px;font:800 12px Orbitron,sans-serif;letter-spacing:3px}
+#tele{margin:0;font:inherit;line-height:1.6;white-space:pre}
+.tool{position:absolute;pointer-events:auto;text-align:center;border:1px solid var(--d);background:var(--bg);font:800 12px Orbitron,sans-serif;letter-spacing:2px;transition:.12s;box-sizing:border-box;user-select:none}
+.tool.hov{background:rgba(0,229,255,.3);box-shadow:0 0 16px var(--c);transform:translateX(-10px)}
+.tool.on{border-color:var(--c);color:#000;background:var(--c)}
+.tool.dis{opacity:.25}.tool.flash{background:#fff;color:#000}
+#cursor{position:absolute;width:48px;height:48px;margin:-24px 0 0 -24px;pointer-events:none;transition:opacity .2s}
+#cursor::before,#cursor::after{content:"";position:absolute;border-radius:50%}
+#cursor::before{inset:0;border:2px dashed var(--c);animation:spin 4s linear infinite;filter:drop-shadow(0 0 4px var(--c))}
+#cursor::after{inset:16px;background:var(--c);box-shadow:0 0 12px var(--c);transition:.1s}
+#cursor.pinch::before{border-color:#3f6;inset:7px}#cursor.pinch::after{background:#3f6;box-shadow:0 0 16px #3f6;inset:18px}
+#ring{position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(#ffb300 calc(var(--p,0)*1turn),transparent 0);-webkit-mask:radial-gradient(circle,transparent 25px,#000 26px);mask:radial-gradient(circle,transparent 25px,#000 26px)}
+@keyframes spin{to{transform:rotate(360deg)}}
+#scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(transparent 0 2px,rgba(0,229,255,.035) 2px 3px)}
+</style>
+</head>
+<body>
+<div id="root">
+  <div id="stage"><div id="cursor" style="opacity:0"><div id="ring"></div></div></div>
+  <div id="scan"></div>
+  <div id="ui">
+    <div id="top"><span id="dot"></span>HOLO-CAD<small>GESTURE MODELER</small><span class="sp"></span><small id="link"></small></div>
+    <div id="banner"></div>
+    <div id="left"><h4>STATUS</h4><pre id="tele"></pre></div>
+  </div>
+</div>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from "three";
+import {STLExporter} from "three/addons/exporters/STLExporter.js";
+const $ = id => document.getElementById(id), V2 = THREE.Vector2, V3 = THREE.Vector3;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+// ---------- tunables (comfort / tolerance) ----------
+const REWIND = 180;        // ms: a pinch clicks where the cursor WAS this long ago (pinching moves the fingertip)
+const DWELL_T = .9;        // seconds of holding still to click (fallback when pinch is unreliable)
+const SMOOTHING = 18, CURSOR_SMOOTHING = 14, ROT = 4, ZOOM = 3, PANG = 1.2;
+const KD = {depth: 14, r: 4, angle: 500};                 // drag sensitivity per parameter
+const PAR = {depth: [.25, -6, 6], r: [.1, 0, 2], angle: [15, 15, 360]};   // step, min, max
+const GRIDS = [.25, .5, 1];
+
+// ---------- sound ----------
+const ac = new AudioContext();
+const beep = (f = 880, d = .06, v = .05) => { if (ac.state !== "running") return; const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.value = v; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d); };
+addEventListener("keydown", () => ac.resume()); addEventListener("pointerdown", () => ac.resume());
+
+// ---------- scene ----------
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, .1, 100);
+const renderer = new THREE.WebGLRenderer({antialias: true});
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); $("stage").prepend(renderer.domElement);
+scene.add(new THREE.AmbientLight(0xffffff, .7));
+const l1 = new THREE.DirectionalLight(0xffffff, 2); l1.position.set(4, 6, 8); scene.add(l1);
+const l2 = new THREE.DirectionalLight(0x66ccff, .8); l2.position.set(-5, -3, -4); scene.add(l2);
+const group = new THREE.Group(); scene.add(group);
+
+let gi = 1, gridObj;
+function makeGrid() {
+  if (gridObj) scene.remove(gridObj);
+  gridObj = new THREE.GridHelper(16, Math.round(16 / GRIDS[gi]), 0x00e5ff, 0x08434d);
+  gridObj.rotation.x = Math.PI / 2; gridObj.material.transparent = true; gridObj.material.opacity = .5; scene.add(gridObj);
+}
+makeGrid();
+const axis = (a, b, c) => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(...a), new V3(...b)]), new THREE.LineBasicMaterial({color: c})); scene.add(l); };
+axis([0, -8, .005], [0, 8, .005], 0xffb300);   // Y axis = revolve axis
+axis([-8, 0, .005], [8, 0, .005], 0x2a8fa0);
+const skLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color: 0xffffff}));
+const skDots = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({color: 0x00e5ff, size: .16}));
+const mark = new THREE.Mesh(new THREE.RingGeometry(.12, .2, 24), new THREE.MeshBasicMaterial({color: 0xffb300}));
+[skLine, skDots].forEach(o => { o.frustumCulled = false; scene.add(o); }); scene.add(mark);
+
+// ---------- model state + history ----------
+let mode = "sketch", sk = {tool: "rect", pts: [], closed: false}, feats = [], draft = null, prev = null;
+const hist = [], redoS = [];
+const dump = () => JSON.stringify({feats, sk});
+const snapshot = () => { hist.push(dump()); redoS.length = 0; if (hist.length > 60) hist.shift(); };
+const restore = s => { const o = JSON.parse(s); feats = o.feats; sk = o.sk; rebuild(); };
+const undo = () => { if (hist.length) { redoS.push(dump()); restore(hist.pop()); } };
+const redo = () => { if (redoS.length) { hist.push(dump()); restore(redoS.pop()); } };
+
+// ---------- geometry ----------
+function roundPoly(pts, r) {            // fillet the corners of a closed polygon
+  if (r < .02) return pts;
+  const n = pts.length, out = [];
+  for (let i = 0; i < n; i++) {
+    const a = pts[(i + n - 1) % n], b = pts[i], c = pts[(i + 1) % n];
+    const v1 = a.clone().sub(b), v2 = c.clone().sub(b), t = Math.min(r, v1.length() / 2, v2.length() / 2);
+    const p1 = b.clone().addScaledVector(v1.normalize(), t), p2 = b.clone().addScaledVector(v2.normalize(), t);
+    for (let s = 0; s <= 6; s++) { const u = s / 6, q = 1 - u; out.push(new V2(q * q * p1.x + 2 * u * q * b.x + u * u * p2.x, q * q * p1.y + 2 * u * q * b.y + u * u * p2.y)); }
+  }
+  return out;
+}
+function buildGeo(d) {
+  const pts = roundPoly(d.pts.map(p => new V2(p[0], p[1])), d.r);
+  if (d.type === "revolve") {
+    const lp = pts.map(p => new V2(Math.max(p.x, .001), p.y)); lp.push(lp[0].clone());
+    return new THREE.LatheGeometry(lp, 48, 0, d.angle * Math.PI / 180);
+  }
+  const h = Math.abs(d.depth), xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const small = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const rb = Math.min(d.r, h / 2 - .02, small / 2 - .03), bev = rb > .03;     // rb = edge fillet on the caps
+  const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {depth: bev ? h - 2 * rb : h, bevelEnabled: bev, bevelThickness: rb, bevelSize: rb, bevelOffset: -rb, bevelSegments: 4, curveSegments: 8});
+  g.translate(0, 0, (bev ? rb : 0) + (d.sym ? -h / 2 : d.depth < 0 ? -h : 0));   // out (+Z), in (-Z) or both
+  return g;
+}
+function mk(d, preview) {
+  const g = buildGeo(d);
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({color: preview ? 0xffb300 : 0x00b8d9, metalness: .3, roughness: .45, transparent: true, opacity: preview ? .55 : .9, side: THREE.DoubleSide}));
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), new THREE.LineBasicMaterial({color: preview ? 0xffe08a : 0xffffff})));
+  return m;
+}
+function disposeObj(o) { o.traverse(c => { c.geometry?.dispose(); c.material?.dispose?.(); }); }
+function rebuild() { [...group.children].forEach(disposeObj); group.clear(); feats.forEach(f => group.add(mk(f))); }
+function refreshPrev() { if (prev) { scene.remove(prev); disposeObj(prev); prev = null; } if (draft) { prev = mk(draft, true); scene.add(prev); } }
+const circ = (a, r) => r < .01 ? [] : Array.from({length: 48}, (_, i) => [+(a[0] + r * Math.cos(i / 48 * 6.2832)).toFixed(3), +(a[1] + r * Math.sin(i / 48 * 6.2832)).toFixed(3)]);
+
+// ---------- sketch actions ----------
+function addPoint(p) {
+  if (sk.closed) return; snapshot(); const a = sk.pts[0];
+  if (sk.tool === "rect") {
+    if (!a) sk.pts = [p]; else if (p[0] !== a[0] && p[1] !== a[1]) { sk.pts = [a, [p[0], a[1]], p, [a[0], p[1]]]; sk.closed = true; } else hist.pop();
+  } else if (sk.tool === "circle") {
+    if (!a) sk.pts = [p]; else { const r = Math.hypot(p[0] - a[0], p[1] - a[1]); if (r >= GRIDS[gi] * .9) { sk.pts = circ(a, r); sk.closed = true; } else hist.pop(); }
+  } else {
+    if (sk.pts.length > 2 && p[0] === a[0] && p[1] === a[1]) sk.closed = true;
+    else if (!sk.pts.some(q => q[0] === p[0] && q[1] === p[1])) sk.pts.push(p); else hist.pop();
+  }
+  beep(1100, .07);
+}
+const tool = t => { sk.tool = t; if (!sk.closed) sk.pts = []; };
+const closePoly = () => { snapshot(); sk.closed = true; };
+const clearSk = () => { snapshot(); sk.pts = []; sk.closed = false; };
+const cycleGrid = () => { gi = (gi + 1) % 3; makeGrid(); snapNode = null; };
+
+// ---------- feature actions ----------
+let tAz = 0, tEl = 0, az = 0, el = 0, dist = 9; const focus = new V3();
+function startF(type) {
+  draft = {type, pts: sk.pts.map(p => p.slice()), depth: 1, sym: false, r: 0, angle: 360, active: type === "extrude" ? "depth" : "angle"};
+  mode = "feature"; tAz = .7; tEl = .5; setItems(FE); refreshPrev();
+}
+function setParam(k, v) {
+  const [s, lo, hi] = PAR[k]; v = clamp(Math.round(v / s) * s, lo, hi);
+  if (k === "depth" && v === 0) v = draft.depth > 0 ? -s : s;
+  v = +v.toFixed(3); if (v !== draft[k]) { draft[k] = v; refreshPrev(); beep(500 + 60 * (k === "depth" ? v : 0) + 600, .03, .03); }
+}
+const nudge = d => setParam(draft.active, draft[draft.active] + d * PAR[draft.active][0]);
+function leaveF() { draft = null; refreshPrev(); mode = "sketch"; tAz = tEl = 0; setItems(SK); }
+function accept() { snapshot(); const {active, ...f} = draft; feats.push(f); sk.pts = []; sk.closed = false; rebuild(); leaveF(); beep(1400, .12); }
+function exportSTL() {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([new STLExporter().parse(group)], {type: "text/plain"})); a.download = "part.stl"; a.click();
+}
+
+// ---------- toolbar (fixed button positions per mode, so nothing moves under the cursor) ----------
+const SK = [
+  ["RECT", () => tool("rect"), () => sk.tool === "rect"], ["CIRCLE", () => tool("circle"), () => sk.tool === "circle"], ["POLYGON", () => tool("poly"), () => sk.tool === "poly"],
+  ["CLOSE", closePoly, 0, () => sk.tool === "poly" && !sk.closed && sk.pts.length > 2], ["CLEAR", clearSk, 0, () => sk.pts.length > 0],
+  ["EXTRUDE", () => startF("extrude"), 0, () => sk.closed], ["REVOLVE", () => startF("revolve"), 0, () => sk.closed],
+  ["UNDO", undo, 0, () => hist.length > 0], ["REDO", redo, 0, () => redoS.length > 0],
+  [() => `GRID ${GRIDS[gi]}`, cycleGrid], [() => `DWELL ${dwell ? "ON" : "OFF"}`, () => (dwell = !dwell), () => dwell], ["EXPORT STL", exportSTL, 0, () => feats.length > 0]];
+const FE = [
+  [() => draft.type === "extrude" ? "DEPTH" : "ANGLE", () => (draft.active = draft.type === "extrude" ? "depth" : "angle"), () => draft.active !== "r"],
+  ["FILLET", () => (draft.active = "r"), () => draft.active === "r"], ["−", () => nudge(-1)], ["+", () => nudge(1)],
+  ["SYMMETRIC", () => { draft.sym = !draft.sym; refreshPrev(); }, () => draft.sym, () => draft.type === "extrude"],
+  ["ACCEPT", accept], ["CANCEL", leaveF]];
+let items = [], btns = [], rects = [], hoverIdx = -1, dwell = true;
+function setItems(a) {
+  btns.forEach(b => b.remove()); items = a;
+  btns = a.map(() => { const e = document.createElement("div"); e.className = "tool"; $("ui").append(e); return e; });
+  hoverIdx = -1; layout();
+}
+function layout() {
+  const n = items.length, top = 96, w = 175, bh = Math.min(56, (innerHeight - top - 20) / n - 6);
+  rects = btns.map((e, i) => { const r = {x: innerWidth - w - 18, y: top + i * (bh + 6), w, h: bh}; e.style.cssText = `left:${r.x}px;top:${r.y}px;width:${w}px;height:${bh}px;line-height:${bh}px`; return r; });
+}
+const hit = (px, py) => rects.findIndex(r => px > r.x - 8 && px < r.x + r.w + 8 && py > r.y - 4 && py < r.y + r.h + 4);   // padded targets
+function activate(i) {
+  const it = items[i]; if (it[3] && !it[3]()) return;
+  it[1](); beep(660, .08); btns[i].classList.add("flash"); setTimeout(() => btns[i]?.classList.remove("flash"), 150);
+}
+
+// ---------- input ----------
+let g = null, cx = .5, cy = .5, sx = .5, sy = .5, cp = {x: .5, y: .5}, pend = {x: 0, y: 0};
+let connected = false, msgCount = 0, msgRate = 0, lastMsg = -1e9, lastMouse = -1e9, lastG = null, clickLock = false, rawP = 0, snapNode = null;
+const buf = [], ray = new THREE.Raycaster(), PLANE = new THREE.Plane(new V3(0, 0, 1), 0), tmp = new V3();
+let mirrored = false;
+(function connect() {
+  const ws = new WebSocket("ws://localhost:8765");
+  ws.onopen = () => (connected = true); ws.onclose = () => { connected = false; setTimeout(connect, 1000); }; ws.onerror = () => ws.close();
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.g !== g) pend.x = pend.y = 0;
+    g = m.g; if (m.g) { cx = m.x; cy = m.y; }          // hand lost: cursor stays where it was
+    const sp = Math.hypot(m.dx, m.dy);
+    if (sp >= .0006) { const b = g === "PINCH" ? 1 : 1 + Math.min(sp / .02, 1); pend.x += m.dx * b; pend.y += m.dy * b; }
+    msgCount++; lastMsg = performance.now();
+  };
+})();
+setInterval(() => { msgRate = msgCount; msgCount = 0; }, 1000);
+// mouse fallback: works when no hand data is arriving
+const mouseOn = () => performance.now() - lastMsg > 1000;
+addEventListener("mousemove", e => { if (mouseOn()) { cx = mirrored ? 1 - e.clientX / innerWidth : e.clientX / innerWidth; cy = e.clientY / innerHeight; g = "POINT"; lastMouse = performance.now(); } });
+addEventListener("mousedown", () => { if (mouseOn()) clickAt(cx, cy); });
+addEventListener("wheel", e => (dist = clamp(dist * (1 + e.deltaY * .001), 3, 30)));
+
+function planePt(x, y) { ray.setFromCamera(new V2(x * 2 - 1, -(y * 2 - 1)), camera); return ray.ray.intersectPlane(PLANE, tmp) ? tmp.clone() : null; }
+const nodeAt = (x, y) => { const p = planePt(x, y), s = GRIDS[gi]; return p && [+(Math.round(p.x / s) * s).toFixed(3), +(Math.round(p.y / s) * s).toFixed(3)]; };
+function clickAt(x, y) {
+  const i = hit(x * innerWidth, y * innerHeight);
+  if (i >= 0) activate(i); else if (mode === "sketch") { const n = nodeAt(x, y); if (n) { snapNode = n; addPoint(n); } }
+}
+
+// ---------- main loop ----------
+let last = performance.now(), da = {x: 0, y: 0}, dT = 0, armed = true, lastKey = "", lastLbl = [];
+function update(now) {
+  requestAnimationFrame(update);
+  const dt = Math.min((now - last) / 1000, .1); last = now;
+  if (now - lastMsg > 300 && now - lastMouse > 2000) { g = null; pend.x = pend.y = 0; }
+  const k = 1 - Math.exp(-SMOOTHING * dt), ax = pend.x * k, ay = pend.y * k; pend.x -= ax; pend.y -= ay;
+
+  if (g !== "PINCH") { const kc = 1 - Math.exp(-CURSOR_SMOOTHING * dt); sx += (cx - sx) * kc; sy += (cy - sy) * kc; buf.push({t: now, x: sx, y: sy}); while (buf.length > 1 && buf[0].t < now - 700) buf.shift(); }
+  if (g === "PINCH" && lastG !== "PINCH") {          // pinch just started: click where the cursor was before the fingers moved
+    cp = [...buf].reverse().find(s => s.t <= now - REWIND) || buf[0] || {x: sx, y: sy};
+    const i = hit(cp.x * innerWidth, cp.y * innerHeight);
+    clickLock = true;
+    if (i >= 0) activate(i);
+    else if (mode === "sketch") { const n = nodeAt(cp.x, cp.y); if (n) { snapNode = n; addPoint(n); } }
+    else { clickLock = false; rawP = draft[draft.active]; }
+  }
+  if (g === "PINCH") { sx = cp.x; sy = cp.y; }
+  lastG = g;
+  const px = sx * innerWidth, py = sy * innerHeight;
+  const cur = $("cursor"); cur.style.left = px + "px"; cur.style.top = py + "px"; cur.style.opacity = g ? 1 : .3; cur.classList.toggle("pinch", g === "PINCH");
+
+  // hover + dwell click
+  const hi = g ? hit(px, py) : -1;
+  if (hi !== hoverIdx) { btns[hoverIdx]?.classList.remove("hov"); if (hi >= 0 && !(items[hi][3] && !items[hi][3]())) { btns[hi].classList.add("hov"); beep(1500, .03, .03); } hoverIdx = hi; }
+  if (dwell && g && g !== "PINCH") {
+    const m = Math.hypot(px - da.x, py - da.y);
+    if (m > (armed ? 26 : 50)) { da = {x: px, y: py}; dT = 0; armed = true; }
+    else if (armed && (hi >= 0 || (mode === "sketch" && !sk.closed))) { dT += dt; if (dT > DWELL_T) { clickAt(sx, sy); armed = false; dT = 0; } }
+  } else dT = 0;
+  $("ring").style.setProperty("--p", dT / DWELL_T);
+
+  // sticky snapping: the snap node only changes once the cursor is clearly past it
+  if (mode === "sketch" && g && g !== "PINCH") {
+    const p = planePt(sx, sy), s = GRIDS[gi];
+    if (p && (!snapNode || Math.hypot(p.x - snapNode[0], p.y - snapNode[1]) > s * .65)) snapNode = nodeAt(sx, sy);
+  }
+
+  // gestures
+  if (mode === "feature") {
+    if (g === "ROTATE") { tAz -= ax * ROT; tEl = clamp(tEl + ay * ROT, -1.4, 1.4); }
+    else if (g === "PINCH" && !clickLock) { const [s, lo, hi2] = PAR[draft.active]; rawP = clamp(rawP - ay * KD[draft.active], lo, hi2); setParam(draft.active, rawP); }
+  }
+  const vh = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist;
+  if (g === "ZOOM") dist = clamp(dist * Math.exp(ay * ZOOM), 3, 30);
+  else if (g === "PAN") { focus.x = clamp(focus.x - ax * vh * camera.aspect * PANG, -8, 8); focus.y = clamp(focus.y + ay * vh * PANG, -8, 8); }
+  az += (tAz - az) * .12; el += (tEl - el) * .12;
+  camera.position.set(focus.x + dist * Math.sin(az) * Math.cos(el), focus.y + dist * Math.sin(el), focus.z + dist * Math.cos(az) * Math.cos(el)); camera.lookAt(focus);
+
+  // sketch overlay (rebuilt only when it changes)
+  let line = [];
+  if (sk.closed) line = [...sk.pts, sk.pts[0]];
+  else if (sk.pts.length) { const a = sk.pts[0], c = snapNode;
+    if (sk.tool === "rect" && c) line = [a, [c[0], a[1]], c, [a[0], c[1]], a];
+    else if (sk.tool === "circle" && c) line = circ(a, Math.hypot(c[0] - a[0], c[1] - a[1]));
+    else if (sk.tool === "poly") line = [...sk.pts, ...(c ? [c] : [])]; }
+  const key = JSON.stringify([line, sk.pts]);
+  if (key !== lastKey) { lastKey = key; skLine.geometry.dispose(); skDots.geometry.dispose(); skLine.geometry.setFromPoints(line.map(p => new V3(p[0], p[1], .01))); skDots.geometry.setFromPoints(sk.pts.map(p => new V3(p[0], p[1], .02))); }
+  mark.visible = mode === "sketch" && !sk.closed && !!snapNode; if (snapNode) mark.position.set(snapNode[0], snapNode[1], .03);
+  gridObj.visible = mode === "sketch" || true;
+
+  // HUD
+  btns.forEach((e, i) => {
+    const it = items[i], l = typeof it[0] === "function" ? it[0]() : it[0]; if (lastLbl[i] !== l) { e.textContent = lastLbl[i] = l; }
+    e.classList.toggle("on", !!(it[2] && it[2]())); e.classList.toggle("dis", !!(it[3] && !it[3]()));
+  });
+  let hint;
+  if (mode === "feature") hint = `${draft.type.toUpperCase()}: PINCH + DRAG UP/DOWN, OR USE − / +   ·   ROTATE TO ORBIT` + (draft.type === "revolve" && draft.pts.some(p => p[0] < 0) ? "   ·   KEEP PROFILE RIGHT OF THE AXIS" : "");
+  else if (sk.closed) hint = "PROFILE CLOSED: PICK EXTRUDE OR REVOLVE";
+  else hint = { rect: sk.pts.length ? "RECT: PICK OPPOSITE CORNER" : "RECT: PICK FIRST CORNER", circle: sk.pts.length ? "CIRCLE: PICK A POINT ON THE EDGE" : "CIRCLE: PICK THE CENTER",
+    poly: "POLYGON: PICK POINTS, THEN THE FIRST POINT OR CLOSE" }[sk.tool];
+  $("banner").textContent = (connected || !mouseOn() ? "" : "MOUSE MODE   ·   ") + hint;
+  const d = draft, mk2 = n => (d && d.active === n ? ">" : " ");
+  $("tele").textContent = `MODE   ${mode.toUpperCase()}\nGRID   ${GRIDS[gi]}\nPARTS  ${feats.length}\nGESTURE ${g ?? "none"}` +
+    (d ? `\n\n${mk2("depth")}DEPTH  ${d.type === "extrude" ? d.depth.toFixed(2) + (d.sym ? " (both)" : d.depth < 0 ? " (in)" : " (out)") : "-"}\n${mk2("angle")}ANGLE  ${d.type === "revolve" ? d.angle + "°" : "-"}\n${mk2("r")}FILLET ${d.r.toFixed(1)}` : "");
+  $("dot").classList.toggle("ok", connected && g !== null);
+  $("link").textContent = connected ? `LINK ${msgRate} msg/s` : "AWAITING gestures_ws.py";
+  renderer.render(scene, camera);
+}
+setItems(SK); requestAnimationFrame(update);
+
+// ---------- keys ----------
+addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (k === "z") undo(); else if (k === "y") redo(); else if (k === "e") exportSTL();
+  else if (k === "m") { mirrored = !mirrored; $("root").style.transform = mirrored ? "scaleX(-1)" : "none"; }
+  else if (k === "f") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  else if (k === "h") $("ui").style.display = $("ui").style.display === "none" ? "block" : "none";
+  else if (mode === "feature") { if (k === "enter") accept(); else if (k === "escape") leaveF(); else if (k === "+" || k === "=") nudge(1); else if (k === "-") nudge(-1); }
+});
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); layout(); });
+</script>
+</body>
+</html>
