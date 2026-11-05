@@ -2,43 +2,39 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HOLO-CAD</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<title>Holo CAD</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--c:#00e5ff;--d:rgba(0,229,255,.3);--bg:rgba(0,16,22,.55)}
-html,body{margin:0;height:100%;background:#000;overflow:hidden;color:var(--c);font:14px "Share Tech Mono",monospace}
+:root{--panel:rgba(16,18,20,.94);--line:#2b3036;--text:#e8eaed;--dim:#868d96;--accent:#ff8a1f;--ok:#4cc38a}
+html,body{margin:0;height:100%;background:#000;overflow:hidden;color:var(--text);font:14px "IBM Plex Sans",system-ui,sans-serif}
 #root{position:fixed;inset:0}
 #stage canvas{display:block}
 #ui{position:absolute;inset:0;pointer-events:none}
-#top{position:absolute;left:0;right:0;top:0;height:46px;display:flex;align-items:center;gap:16px;padding:0 20px;border-bottom:1px solid var(--d);background:linear-gradient(#00303a66,transparent);font:800 15px Orbitron,sans-serif;letter-spacing:4px}
-#top small{font:12px "Share Tech Mono";letter-spacing:1px;opacity:.8}.sp{flex:1}
-#dot{width:9px;height:9px;border-radius:50%;background:#f33;box-shadow:0 0 8px #f33}#dot.ok{background:#3f6;box-shadow:0 0 8px #3f6}
-#banner{position:absolute;top:56px;left:50%;transform:translateX(-50%);padding:8px 22px;background:var(--bg);border:1px solid var(--d);font:800 13px Orbitron,sans-serif;letter-spacing:2px;white-space:nowrap}
-#left{position:absolute;left:16px;top:70px;width:240px;background:var(--bg);border:1px solid var(--d);border-left:3px solid var(--c);padding:10px 14px}
-#left h4{margin:0 0 6px;font:800 12px Orbitron,sans-serif;letter-spacing:3px}
-#tele{margin:0;font:inherit;line-height:1.6;white-space:pre}
-.tool{position:absolute;pointer-events:auto;text-align:center;border:1px solid var(--d);background:var(--bg);font:800 12px Orbitron,sans-serif;letter-spacing:2px;transition:.12s;box-sizing:border-box;user-select:none}
-.tool.hov{background:rgba(0,229,255,.3);box-shadow:0 0 16px var(--c);transform:translateX(-10px)}
-.tool.on{border-color:var(--c);color:#000;background:var(--c)}
-.tool.dis{opacity:.25}.tool.flash{background:#fff;color:#000}
-#cursor{position:absolute;width:48px;height:48px;margin:-24px 0 0 -24px;pointer-events:none;transition:opacity .2s}
-#cursor::before,#cursor::after{content:"";position:absolute;border-radius:50%}
-#cursor::before{inset:0;border:2px dashed var(--c);animation:spin 4s linear infinite;filter:drop-shadow(0 0 4px var(--c))}
-#cursor::after{inset:16px;background:var(--c);box-shadow:0 0 12px var(--c);transition:.1s}
-#cursor.pinch::before{border-color:#3f6;inset:7px}#cursor.pinch::after{background:#3f6;box-shadow:0 0 16px #3f6;inset:18px}
-#ring{position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(#ffb300 calc(var(--p,0)*1turn),transparent 0);-webkit-mask:radial-gradient(circle,transparent 25px,#000 26px);mask:radial-gradient(circle,transparent 25px,#000 26px)}
-@keyframes spin{to{transform:rotate(360deg)}}
-#scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(transparent 0 2px,rgba(0,229,255,.035) 2px 3px)}
+#top{position:absolute;left:0;right:0;top:0;height:40px;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line);font-weight:600}
+#top small{font:400 12px "IBM Plex Mono",monospace;color:var(--dim)}.sp{flex:1}
+#dot{width:8px;height:8px;border-radius:50%;background:#d9534f}#dot.ok{background:var(--ok)}
+#banner{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);padding:9px 16px;background:var(--panel);border:1px solid var(--line);border-radius:6px;white-space:nowrap}
+#left{position:absolute;left:16px;top:56px;width:230px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+#left h4{margin:0 0 8px;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+#tele{margin:0;font:400 12.5px/1.65 "IBM Plex Mono",monospace;white-space:pre}
+.tool{position:absolute;pointer-events:auto;padding-left:14px;border:1px solid var(--line);border-radius:6px;background:var(--panel);font-weight:500;box-sizing:border-box;user-select:none;transition:background .1s,border-color .1s}
+.tool.hov{border-color:var(--accent);background:#221b13}
+.tool.on{border-color:var(--accent);background:rgba(255,138,31,.16);color:var(--accent)}
+.tool.pri{border-color:var(--ok);color:var(--ok)}
+.tool.dis{opacity:.35}.tool.flash{background:var(--accent);border-color:var(--accent);color:#111}
+#cursor{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;pointer-events:none;border:2px solid #fff;border-radius:50%;box-sizing:border-box;transition:opacity .2s,background .1s}
+#cursor::after{content:"";position:absolute;inset:9px;border-radius:50%;background:#fff}
+#cursor.pinch{background:var(--accent);border-color:var(--accent)}#cursor.pinch::after{background:#111}
+#ring{position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--p,0)*1turn),transparent 0);-webkit-mask:radial-gradient(circle,transparent 16px,#000 17px);mask:radial-gradient(circle,transparent 16px,#000 17px)}
 </style>
 </head>
 <body>
 <div id="root">
   <div id="stage"><div id="cursor" style="opacity:0"><div id="ring"></div></div></div>
-  <div id="scan"></div>
   <div id="ui">
-    <div id="top"><span id="dot"></span>HOLO-CAD<small>GESTURE MODELER</small><span class="sp"></span><small id="link"></small></div>
+    <div id="top"><span id="dot"></span>Holo CAD<span class="sp"></span><small id="link"></small></div>
     <div id="banner"></div>
-    <div id="left"><h4>STATUS</h4><pre id="tele"></pre></div>
+    <div id="left"><h4>Status</h4><pre id="tele"></pre></div>
   </div>
 </div>
 <script type="importmap">
@@ -69,22 +65,22 @@ const renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); $("stage").prepend(renderer.domElement);
 scene.add(new THREE.AmbientLight(0xffffff, .7));
 const l1 = new THREE.DirectionalLight(0xffffff, 2); l1.position.set(4, 6, 8); scene.add(l1);
-const l2 = new THREE.DirectionalLight(0x66ccff, .8); l2.position.set(-5, -3, -4); scene.add(l2);
+const l2 = new THREE.DirectionalLight(0xffffff, .5); l2.position.set(-5, -3, -4); scene.add(l2);
 const group = new THREE.Group(); scene.add(group);
 
 let gi = 1, gridObj;
 function makeGrid() {
   if (gridObj) scene.remove(gridObj);
-  gridObj = new THREE.GridHelper(16, Math.round(16 / GRIDS[gi]), 0x00e5ff, 0x08434d);
-  gridObj.rotation.x = Math.PI / 2; gridObj.material.transparent = true; gridObj.material.opacity = .5; scene.add(gridObj);
+  gridObj = new THREE.GridHelper(16, Math.round(16 / GRIDS[gi]), 0x3d444c, 0x20252a);
+  gridObj.rotation.x = Math.PI / 2; gridObj.material.transparent = true; gridObj.material.opacity = .9; scene.add(gridObj);
 }
 makeGrid();
 const axis = (a, b, c) => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(...a), new V3(...b)]), new THREE.LineBasicMaterial({color: c})); scene.add(l); };
-axis([0, -8, .005], [0, 8, .005], 0xffb300);   // Y axis = revolve axis
-axis([-8, 0, .005], [8, 0, .005], 0x2a8fa0);
+axis([0, -8, .005], [0, 8, .005], 0x58b368);   // Y axis = revolve axis
+axis([-8, 0, .005], [8, 0, .005], 0xc0504d);
 const skLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color: 0xffffff}));
-const skDots = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({color: 0x00e5ff, size: .16}));
-const mark = new THREE.Mesh(new THREE.RingGeometry(.12, .2, 24), new THREE.MeshBasicMaterial({color: 0xffb300}));
+const skDots = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({color: 0xffffff, size: .14}));
+const mark = new THREE.Mesh(new THREE.RingGeometry(.12, .2, 24), new THREE.MeshBasicMaterial({color: 0xff8a1f}));
 [skLine, skDots].forEach(o => { o.frustumCulled = false; scene.add(o); }); scene.add(mark);
 
 // ---------- model state + history ----------
@@ -123,8 +119,8 @@ function buildGeo(d) {
 }
 function mk(d, preview) {
   const g = buildGeo(d);
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({color: preview ? 0xffb300 : 0x00b8d9, metalness: .3, roughness: .45, transparent: true, opacity: preview ? .55 : .9, side: THREE.DoubleSide}));
-  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), new THREE.LineBasicMaterial({color: preview ? 0xffe08a : 0xffffff})));
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({color: preview ? 0xff8a1f : 0xb9c0c8, metalness: .15, roughness: .55, transparent: preview, opacity: preview ? .5 : 1, side: THREE.DoubleSide}));
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), new THREE.LineBasicMaterial({color: preview ? 0xffc27a : 0x14181c})));
   return m;
 }
 function disposeObj(o) { o.traverse(c => { c.geometry?.dispose(); c.material?.dispose?.(); }); }
@@ -171,25 +167,26 @@ function exportSTL() {
 
 // ---------- toolbar (fixed button positions per mode, so nothing moves under the cursor) ----------
 const SK = [
-  ["RECT", () => tool("rect"), () => sk.tool === "rect"], ["CIRCLE", () => tool("circle"), () => sk.tool === "circle"], ["POLYGON", () => tool("poly"), () => sk.tool === "poly"],
-  ["CLOSE", closePoly, 0, () => sk.tool === "poly" && !sk.closed && sk.pts.length > 2], ["CLEAR", clearSk, 0, () => sk.pts.length > 0],
-  ["EXTRUDE", () => startF("extrude"), 0, () => sk.closed], ["REVOLVE", () => startF("revolve"), 0, () => sk.closed],
-  ["UNDO", undo, 0, () => hist.length > 0], ["REDO", redo, 0, () => redoS.length > 0],
-  [() => `GRID ${GRIDS[gi]}`, cycleGrid], [() => `DWELL ${dwell ? "ON" : "OFF"}`, () => (dwell = !dwell), () => dwell], ["EXPORT STL", exportSTL, 0, () => feats.length > 0]];
+  ["Rectangle", () => tool("rect"), () => sk.tool === "rect"], ["Circle", () => tool("circle"), () => sk.tool === "circle"], ["Polygon", () => tool("poly"), () => sk.tool === "poly"],
+  ["Close", closePoly, 0, () => sk.tool === "poly" && !sk.closed && sk.pts.length > 2], ["Clear", clearSk, 0, () => sk.pts.length > 0],
+  ["Extrude", () => startF("extrude"), 0, () => sk.closed], ["Revolve", () => startF("revolve"), 0, () => sk.closed],
+  ["Undo", undo, 0, () => hist.length > 0], ["Redo", redo, 0, () => redoS.length > 0],
+  [() => `Grid ${GRIDS[gi]}`, cycleGrid], [() => `Dwell click ${dwell ? "on" : "off"}`, () => (dwell = !dwell), () => dwell], ["Export STL", exportSTL, 0, () => feats.length > 0]];
 const FE = [
-  [() => draft.type === "extrude" ? "DEPTH" : "ANGLE", () => (draft.active = draft.type === "extrude" ? "depth" : "angle"), () => draft.active !== "r"],
-  ["FILLET", () => (draft.active = "r"), () => draft.active === "r"], ["−", () => nudge(-1)], ["+", () => nudge(1)],
-  ["SYMMETRIC", () => { draft.sym = !draft.sym; refreshPrev(); }, () => draft.sym, () => draft.type === "extrude"],
-  ["ACCEPT", accept], ["CANCEL", leaveF]];
-let items = [], btns = [], rects = [], hoverIdx = -1, dwell = true;
+  [() => draft.type === "extrude" ? "Depth" : "Angle", () => (draft.active = draft.type === "extrude" ? "depth" : "angle"), () => draft.active !== "r"],
+  ["Fillet", () => (draft.active = "r"), () => draft.active === "r"], ["−", () => nudge(-1)], ["+", () => nudge(1)],
+  ["Symmetric", () => { draft.sym = !draft.sym; refreshPrev(); }, () => draft.sym, () => draft.type === "extrude"],
+  ["Accept", accept], ["Cancel", leaveF]];
+SK.brk = [3, 5, 7, 9]; FE.brk = [2, 4, 5];
+let items = [], btns = [], rects = [], hoverIdx = -1, dwell = false;
 function setItems(a) {
   btns.forEach(b => b.remove()); items = a;
   btns = a.map(() => { const e = document.createElement("div"); e.className = "tool"; $("ui").append(e); return e; });
   hoverIdx = -1; layout();
 }
 function layout() {
-  const n = items.length, top = 96, w = 175, bh = Math.min(56, (innerHeight - top - 20) / n - 6);
-  rects = btns.map((e, i) => { const r = {x: innerWidth - w - 18, y: top + i * (bh + 6), w, h: bh}; e.style.cssText = `left:${r.x}px;top:${r.y}px;width:${w}px;height:${bh}px;line-height:${bh}px`; return r; });
+  const brk = items.brk || [], G = 14, n = items.length, top = 56, w = 175, bh = Math.min(52, (innerHeight - top - 70 - brk.length * G) / n - 6);
+  rects = btns.map((e, i) => { const r = {x: innerWidth - w - 16, y: top + i * (bh + 6) + brk.filter(b => b <= i).length * G, w, h: bh}; e.style.cssText = `left:${r.x}px;top:${r.y}px;width:${w}px;height:${bh}px;line-height:${bh - 2}px`; return r; });
 }
 const hit = (px, py) => rects.findIndex(r => px > r.x - 8 && px < r.x + r.w + 8 && py > r.y - 4 && py < r.y + r.h + 4);   // padded targets
 function activate(i) {
@@ -256,7 +253,7 @@ function update(now) {
   if (dwell && g && g !== "PINCH") {
     const m = Math.hypot(px - da.x, py - da.y);
     if (m > (armed ? 26 : 50)) { da = {x: px, y: py}; dT = 0; armed = true; }
-    else if (armed && (hi >= 0 || (mode === "sketch" && !sk.closed))) { dT += dt; if (dT > DWELL_T) { clickAt(sx, sy); armed = false; dT = 0; } }
+    else if (armed && hi >= 0) { dT += dt; if (dT > DWELL_T) { clickAt(sx, sy); armed = false; dT = 0; } }
   } else dT = 0;
   $("ring").style.setProperty("--p", dT / DWELL_T);
 
@@ -292,19 +289,20 @@ function update(now) {
   // HUD
   btns.forEach((e, i) => {
     const it = items[i], l = typeof it[0] === "function" ? it[0]() : it[0]; if (lastLbl[i] !== l) { e.textContent = lastLbl[i] = l; }
-    e.classList.toggle("on", !!(it[2] && it[2]())); e.classList.toggle("dis", !!(it[3] && !it[3]()));
+    e.classList.toggle("on", !!(it[2] && it[2]())); e.classList.toggle("dis", !!(it[3] && !it[3]())); e.classList.toggle("pri", l === "Accept");
   });
   let hint;
-  if (mode === "feature") hint = `${draft.type.toUpperCase()}: PINCH + DRAG UP/DOWN, OR USE − / +   ·   ROTATE TO ORBIT` + (draft.type === "revolve" && draft.pts.some(p => p[0] < 0) ? "   ·   KEEP PROFILE RIGHT OF THE AXIS" : "");
-  else if (sk.closed) hint = "PROFILE CLOSED: PICK EXTRUDE OR REVOLVE";
-  else hint = { rect: sk.pts.length ? "RECT: PICK OPPOSITE CORNER" : "RECT: PICK FIRST CORNER", circle: sk.pts.length ? "CIRCLE: PICK A POINT ON THE EDGE" : "CIRCLE: PICK THE CENTER",
-    poly: "POLYGON: PICK POINTS, THEN THE FIRST POINT OR CLOSE" }[sk.tool];
-  $("banner").textContent = (connected || !mouseOn() ? "" : "MOUSE MODE   ·   ") + hint;
-  const d = draft, mk2 = n => (d && d.active === n ? ">" : " ");
-  $("tele").textContent = `MODE   ${mode.toUpperCase()}\nGRID   ${GRIDS[gi]}\nPARTS  ${feats.length}\nGESTURE ${g ?? "none"}` +
-    (d ? `\n\n${mk2("depth")}DEPTH  ${d.type === "extrude" ? d.depth.toFixed(2) + (d.sym ? " (both)" : d.depth < 0 ? " (in)" : " (out)") : "-"}\n${mk2("angle")}ANGLE  ${d.type === "revolve" ? d.angle + "°" : "-"}\n${mk2("r")}FILLET ${d.r.toFixed(1)}` : "");
+  if (mode === "feature") hint = `Pinch and drag up or down to change the ${({depth: "depth", angle: "angle", r: "fillet"})[draft.active]}, or use − and +. Rotate to orbit.` + (draft.type === "revolve" && draft.pts.some(p => p[0] < 0) ? " Keep the profile right of the green axis." : "");
+  else if (sk.closed) hint = "Profile closed. Extrude or revolve it.";
+  else hint = { rect: sk.pts.length ? "Pick the opposite corner" : "Pick the first corner", circle: sk.pts.length ? "Pick a point on the edge" : "Pick the center",
+    poly: "Pick points, then the first point or Close to finish" }[sk.tool];
+  $("banner").textContent = (connected || !mouseOn() ? "" : "Mouse mode · ") + hint;
+  const d = draft, row = (x, y) => x.padEnd(9) + y, mk2 = n => (d && d.active === n ? "> " : "  ");
+  $("tele").textContent = [row("Mode", mode), row("Grid", GRIDS[gi]), row("Parts", feats.length), row("Gesture", g ? g.toLowerCase() : "none")].map(x => "  " + x).join("\n") +
+    (d ? "\n\n" + [mk2("depth") + row("Depth", d.type === "extrude" ? d.depth.toFixed(2) + (d.sym ? " both" : d.depth < 0 ? " in" : " out") : "-"),
+      mk2("angle") + row("Angle", d.type === "revolve" ? d.angle + "°" : "-"), mk2("r") + row("Fillet", d.r.toFixed(1))].join("\n") : "");
   $("dot").classList.toggle("ok", connected && g !== null);
-  $("link").textContent = connected ? `LINK ${msgRate} msg/s` : "AWAITING gestures_ws.py";
+  $("link").textContent = connected ? `${msgRate} msg/s` : "Waiting for gestures_ws.py";
   renderer.render(scene, camera);
 }
 setItems(SK); requestAnimationFrame(update);
